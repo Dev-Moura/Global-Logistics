@@ -5,14 +5,29 @@ services:
     image: postgres:15
     container_name: logistics-db
     restart: always
+    env_file: .env
     environment:
-      - POSTGRES_DB=global_logistics
-      - POSTGRES_USER=dev_user
-      - POSTGRES_PASSWORD=dev_password
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-  
+
+  api:
+    build: .
+    container_name: global_logistics-api
+    restart: on-failure
+    depends_on:
+      - db
+    env_file: .env
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/${DB_NAME}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "8080:8080"
+
 volumes:
   postgres_data:

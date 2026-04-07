@@ -15,12 +15,12 @@ public class ShipmentService {
     private final ShipmentRepository shipmentRepository;
 
     @Transactional
-    public shipment createShipment(Shipment shipmenet) {
+    public Shipment createShipment(Shipment shipment) {
         // Regra de négocio: Gerar um tracking number único para cada envio
         if(shipment.getTrackingNumber() == null) {
             shipment.setTrackingNumber("TRK--" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         }
-        return shipmentRepository.save(shipment)
+        return shipmentRepository.save(shipment);
     }    
 
 
