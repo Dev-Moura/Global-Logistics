@@ -11,5 +11,5 @@ import java.util.Optional;
 @Repository // Esta anotação avisa ao spring que essa classe cuida do banco
 public interface ShipmentRepository extends JpaRepository<Shipment, UUID> {
 
-    Optional<Shipment> findBytrackingNumber(String trackingNumber);
+    Optional<Shipment> findByTrackingNumber(String trackingNumber);
 }

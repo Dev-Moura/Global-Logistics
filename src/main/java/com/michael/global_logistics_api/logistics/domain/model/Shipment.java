@@ -37,6 +37,10 @@ public class Shipment {
 
     private LocalDateTime createdAt;
 
+    private Double distance;
+
+    private BigDecimal shippingCost;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
