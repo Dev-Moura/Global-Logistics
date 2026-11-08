@@ -1,16 +1,21 @@
 package com.michael.global_logistics_api.common.api;
 
+import com.michael.global_logistics_api.common.domain.ConflictException;
 import com.michael.global_logistics_api.common.domain.DomainException;
 import com.michael.global_logistics_api.common.domain.InvalidStateTransitionException;
 import com.michael.global_logistics_api.common.domain.ResourceNotFoundException;
+import com.michael.global_logistics_api.common.domain.UnauthorizedException;
 import com.michael.global_logistics_api.common.observability.CorrelationIdFilter;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -31,6 +36,31 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidStateTransitionException.class)
     public ResponseEntity<ProblemDetail> handleInvalidStateTransition(InvalidStateTransitionException exception) {
         return build(HttpStatus.CONFLICT, exception.getCode(), exception.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ProblemDetail> handleConflict(ConflictException exception) {
+        return build(HttpStatus.CONFLICT, exception.getCode(), exception.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        return build(HttpStatus.CONFLICT, "CONFLICT", "The request conflicts with existing data");
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ProblemDetail> handleUnauthorized(UnauthorizedException exception) {
+        return build(HttpStatus.UNAUTHORIZED, exception.getCode(), exception.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ProblemDetail> handleAuthentication(AuthenticationException exception) {
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ProblemDetail> handleAccessDenied(AccessDeniedException exception) {
+        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "Access denied");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
