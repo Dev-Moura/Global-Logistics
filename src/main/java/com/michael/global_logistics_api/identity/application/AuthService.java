@@ -88,6 +88,10 @@ public class AuthService {
             throw new UnauthorizedException("Invalid email or password");
         }
 
+        if (user.getOrganization().getStatus() != OrganizationStatus.ACTIVE) {
+            throw new UnauthorizedException("Invalid email or password");
+        }
+
         return issueTokens(user);
     }
 
@@ -107,7 +111,7 @@ public class AuthService {
         }
 
         User user = currentToken.getUser();
-        if (!user.isActive()) {
+        if (!user.isActive() || user.getOrganization().getStatus() != OrganizationStatus.ACTIVE) {
             throw new UnauthorizedException("Invalid refresh token");
         }
 
