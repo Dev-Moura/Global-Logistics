@@ -1,17 +1,35 @@
 package com.michael.global_logistics_api.shipment.application;
 
-import com.michael.global_logistics_api.common.domain.DomainException;
-import com.michael.global_logistics_api.common.domain.InvalidStateTransitionException;
+import com.michael.global_logistics_api.carrier.domain.Carrier;
+import com.michael.global_logistics_api.carrier.infrastructure.CarrierRepository;
+import com.michael.global_logistics_api.common.api.PageResponse;
+import com.michael.global_logistics_api.common.domain.ConflictException;
 import com.michael.global_logistics_api.common.domain.ResourceNotFoundException;
+import com.michael.global_logistics_api.common.security.CurrentUser;
+import com.michael.global_logistics_api.common.security.CurrentUserProvider;
+import com.michael.global_logistics_api.location.domain.Location;
+import com.michael.global_logistics_api.location.infrastructure.LocationRepository;
+import com.michael.global_logistics_api.shipment.api.dto.CreateShipmentRequest;
+import com.michael.global_logistics_api.shipment.api.dto.ShipmentResponse;
+import com.michael.global_logistics_api.shipment.api.dto.UpdateShipmentRequest;
+import com.michael.global_logistics_api.shipment.domain.FreightCalculator;
+import com.michael.global_logistics_api.shipment.domain.FreightDetails;
 import com.michael.global_logistics_api.shipment.domain.Shipment;
+import com.michael.global_logistics_api.shipment.domain.ShipmentStateMachine;
 import com.michael.global_logistics_api.shipment.domain.ShipmentStatus;
+import com.michael.global_logistics_api.shipment.domain.TrackingNumberGenerator;
 import com.michael.global_logistics_api.shipment.infrastructure.ShipmentRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,72 +37,197 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ShipmentService {
 
+    private static final int MAX_PAGE_SIZE = 100;
+    private static final String DEFAULT_SORT_PROPERTY = "createdAt";
+
     private final ShipmentRepository shipmentRepository;
-
-    private BigDecimal calculateFreight(Double weight, Double distance, BigDecimal insurenceValue) {
-        double weightComponent = weight * 5.0;
-        double distanceComponent = distance * 0.5;
-
-        BigDecimal riskTax = (insurenceValue != null)
-                ? insurenceValue.multiply(new BigDecimal("0.01"))
-                : BigDecimal.ZERO;
-
-        BigDecimal baseCost = BigDecimal.valueOf(weightComponent + distanceComponent);
-
-        return baseCost.add(riskTax).setScale(2, RoundingMode.HALF_UP);
-    }
+    private final LocationRepository locationRepository;
+    private final CarrierRepository carrierRepository;
+    private final CurrentUserProvider currentUserProvider;
+    private final ShipmentMapper shipmentMapper;
 
     @Transactional
-    public Shipment createShipment(Shipment shipment) {
-        if (shipment.getWeight() <= 0) {
-            throw new DomainException("INVALID_WEIGHT", "peso inválido para transporte internacional");
+    public ShipmentResponse create(CreateShipmentRequest request) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser();
+        UUID organizationId = currentUser.organizationId();
+
+        Location origin = findLocation(request.originId());
+        Location destination = findLocation(request.destinationId());
+        Carrier carrier = request.carrierId() == null ? null : findCarrier(request.carrierId());
+
+        String trackingNumber = normalizeTrackingNumber(request.trackingNumber());
+        if (trackingNumber == null) {
+            trackingNumber = TrackingNumberGenerator.generate();
         }
 
-        BigDecimal finalCost = calculateFreight(
-                shipment.getWeight(),
-                shipment.getDistance(),
-                shipment.getInsuranceValue()
+        if (shipmentRepository.existsByOrganizationIdAndTrackingNumber(organizationId, trackingNumber)) {
+            throw new ConflictException("DUPLICATE_TRACKING_NUMBER",
+                    "Este Tracking Number já está em uso!");
+        }
+
+        FreightDetails freight = FreightCalculator.calculate(
+                request.weightKg(),
+                request.distanceKm(),
+                request.insuredValue()
         );
 
-        shipment.setShippingCost(finalCost);
+        Shipment shipment = new Shipment();
+        shipment.setOrganizationId(organizationId);
+        shipment.setTrackingNumber(trackingNumber);
+        shipment.setOrigin(origin);
+        shipment.setDestination(destination);
+        shipment.setCarrier(carrier);
+        shipment.setFreight(freight);
+        shipment.setEstimatedDeparture(request.estimatedDeparture());
+        shipment.setEstimatedArrival(request.estimatedArrival());
+        shipment.setStatus(ShipmentStatus.PENDING);
 
-        if (shipment.getTrackingNumber() != null) {
-            shipmentRepository.findByTrackingNumber(shipment.getTrackingNumber())
-                    .ifPresent(s -> {
-                        throw new DomainException("DUPLICATE_TRACKING_NUMBER", "Este Tracking Number já está em uso!");
-                    });
-        } else {
-            shipment.setTrackingNumber("TRK-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-        }
-
-        return shipmentRepository.save(shipment);
+        return shipmentMapper.toResponse(shipmentRepository.save(shipment));
     }
 
     @Transactional(readOnly = true)
-    public List<Shipment> findAll() {
-        return shipmentRepository.findAll();
+    public ShipmentResponse get(UUID id) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser();
+        return shipmentMapper.toResponse(findOwned(id, currentUser.organizationId()));
     }
 
     @Transactional(readOnly = true)
-    public Shipment findById(UUID id) {
-        return shipmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Remessa nao encontrada"));
+    public PageResponse<ShipmentResponse> list(ShipmentFilter filter, Pageable pageable) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser();
+        Pageable safePageable = sanitizePageable(pageable);
+
+        Page<Shipment> page = shipmentRepository.findAll(
+                buildSpecification(currentUser.organizationId(), filter),
+                safePageable
+        );
+
+        return PageResponse.from(page.map(shipmentMapper::toResponse));
     }
 
     @Transactional
-    public Shipment updateStatus(UUID id, ShipmentStatus newStatus) {
-        Shipment shipment = shipmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Remessa nao encontrada"));
+    public ShipmentResponse update(UUID id, UpdateShipmentRequest request) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser();
+        Shipment shipment = findOwned(id, currentUser.organizationId());
 
-        if (shipment.getStatus() == ShipmentStatus.DELIVERED) {
-            throw new InvalidStateTransitionException("Nao e possivel alterar o status de uma carga ja entregue");
+        if (isTerminal(shipment.getStatus())) {
+            throw new ConflictException("SHIPMENT_TERMINAL",
+                    "Não é possível atualizar uma remessa em estado terminal");
         }
 
-        if (shipment.getStatus() == newStatus) {
-            throw new InvalidStateTransitionException("A remessa ja possui o status: " + newStatus);
+        if (request.originId() != null) {
+            shipment.setOrigin(findLocation(request.originId()));
         }
 
-        shipment.setStatus(newStatus);
-        return shipmentRepository.save(shipment);
+        if (request.destinationId() != null) {
+            shipment.setDestination(findLocation(request.destinationId()));
+        }
+
+        if (request.carrierId() != null) {
+            shipment.setCarrier(findCarrier(request.carrierId()));
+        }
+
+        if (request.estimatedDeparture() != null) {
+            shipment.setEstimatedDeparture(request.estimatedDeparture());
+        }
+
+        if (request.estimatedArrival() != null) {
+            shipment.setEstimatedArrival(request.estimatedArrival());
+        }
+
+        return shipmentMapper.toResponse(shipmentRepository.saveAndFlush(shipment));
+    }
+
+    @Transactional
+    public ShipmentResponse updateStatus(UUID id, ShipmentStatus newStatus) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser();
+        Shipment shipment = findOwned(id, currentUser.organizationId());
+
+        ShipmentStateMachine.transition(shipment, newStatus, currentUser.role());
+
+        return shipmentMapper.toResponse(shipmentRepository.saveAndFlush(shipment));
+    }
+
+    @Transactional
+    public ShipmentResponse cancel(UUID id) {
+        CurrentUser currentUser = currentUserProvider.getCurrentUser();
+        Shipment shipment = findOwned(id, currentUser.organizationId());
+
+        ShipmentStateMachine.transition(shipment, ShipmentStatus.CANCELLED, currentUser.role());
+
+        return shipmentMapper.toResponse(shipmentRepository.saveAndFlush(shipment));
+    }
+
+    private Shipment findOwned(UUID id, UUID organizationId) {
+        return shipmentRepository.findByIdAndOrganizationId(id, organizationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shipment not found"));
+    }
+
+    private Location findLocation(UUID id) {
+        return locationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Location not found"));
+    }
+
+    private Carrier findCarrier(UUID id) {
+        return carrierRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Carrier not found"));
+    }
+
+    private Specification<Shipment> buildSpecification(UUID organizationId, ShipmentFilter filter) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(criteriaBuilder.equal(root.get("organizationId"), organizationId));
+
+            if (filter != null) {
+                if (filter.status() != null) {
+                    predicates.add(criteriaBuilder.equal(root.get("status"), filter.status()));
+                }
+
+                if (filter.originId() != null) {
+                    predicates.add(criteriaBuilder.equal(root.get("origin").get("id"), filter.originId()));
+                }
+
+                if (filter.destinationId() != null) {
+                    predicates.add(criteriaBuilder.equal(root.get("destination").get("id"), filter.destinationId()));
+                }
+
+                String trackingNumber = normalizeTrackingNumber(filter.trackingNumber());
+                if (trackingNumber != null) {
+                    predicates.add(criteriaBuilder.equal(root.get("trackingNumber"), trackingNumber));
+                }
+
+                if (filter.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), filter.from()));
+                }
+
+                if (filter.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), filter.to()));
+                }
+            }
+
+            return criteriaBuilder.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
+    private Pageable sanitizePageable(Pageable pageable) {
+        int pageNumber = Math.max(pageable.getPageNumber(), 0);
+        int pageSize = Math.min(Math.max(pageable.getPageSize(), 1), MAX_PAGE_SIZE);
+        Sort sort = pageable.getSort().isSorted()
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.DESC, DEFAULT_SORT_PROPERTY);
+
+        return PageRequest.of(pageNumber, pageSize, sort);
+    }
+
+    private boolean isTerminal(ShipmentStatus status) {
+        return status == ShipmentStatus.DELIVERED || status == ShipmentStatus.CANCELLED;
+    }
+
+    private String normalizeTrackingNumber(String trackingNumber) {
+        if (trackingNumber == null) {
+            return null;
+        }
+
+        String trimmed = trackingNumber.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }
