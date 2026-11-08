@@ -23,6 +23,24 @@ class HealthSmokeIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void livenessEndpointIsPublic() throws Exception {
+        mockMvc.perform(get("/actuator/health/liveness"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void readinessEndpointIsPublic() throws Exception {
+        mockMvc.perform(get("/actuator/health/readiness"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void metricsEndpointRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void protectedEndpointWithoutTokenReturnsProblemDetail() throws Exception {
         mockMvc.perform(get("/api/v1/shipments"))
                 .andExpect(status().isUnauthorized())

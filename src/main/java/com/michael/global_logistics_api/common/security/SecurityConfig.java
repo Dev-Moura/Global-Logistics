@@ -36,6 +36,7 @@ public class SecurityConfig {
                                 ApiPaths.API_V1 + "/auth/register",
                                 ApiPaths.API_V1 + "/auth/login",
                                 ApiPaths.API_V1 + "/auth/refresh").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .anyRequest().authenticated()
                 )

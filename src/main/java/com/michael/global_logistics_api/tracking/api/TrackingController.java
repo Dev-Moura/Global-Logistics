@@ -5,6 +5,8 @@ import com.michael.global_logistics_api.tracking.api.dto.CreateTrackingEventRequ
 import com.michael.global_logistics_api.tracking.api.dto.TrackingEventResponse;
 import com.michael.global_logistics_api.tracking.api.dto.TrackingInfoResponse;
 import com.michael.global_logistics_api.tracking.application.TrackingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,12 +25,14 @@ import java.util.UUID;
 @RestController
 @RequestMapping(ApiPaths.API_V1)
 @RequiredArgsConstructor
+@Tag(name = "Tracking", description = "Registro de eventos e consulta de rastreamento")
 public class TrackingController {
 
     private final TrackingService trackingService;
 
     @PostMapping("/shipments/{shipmentId}/events")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OPERATOR')")
+    @Operation(summary = "Registrar evento de rastreamento")
     public ResponseEntity<TrackingEventResponse> register(@PathVariable UUID shipmentId,
                                                           @Valid @RequestBody CreateTrackingEventRequest request) {
         TrackingService.RegistrationResult result = trackingService.register(shipmentId, request);
@@ -37,11 +41,13 @@ public class TrackingController {
     }
 
     @GetMapping("/shipments/{shipmentId}/events")
+    @Operation(summary = "Listar eventos de rastreamento da remessa")
     public List<TrackingEventResponse> listByShipment(@PathVariable UUID shipmentId) {
         return trackingService.listByShipment(shipmentId);
     }
 
     @GetMapping("/tracking/{trackingNumber}")
+    @Operation(summary = "Consultar rastreamento pelo número")
     public TrackingInfoResponse track(@PathVariable String trackingNumber) {
         return trackingService.track(trackingNumber);
     }
