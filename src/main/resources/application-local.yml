@@ -2,6 +2,10 @@ spring:
   jpa:
     show-sql: true
 
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:local-dev-secret-change-me-please-32bytes-min}
+
 logging:
   level:
     com.michael.global_logistics_api: DEBUG

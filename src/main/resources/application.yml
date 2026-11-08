@@ -45,7 +45,7 @@ info:
 
 app:
   jwt:
-    secret: ${APP_JWT_SECRET:dev-only-secret-change-me-please-32bytes-min}
+    secret: ${APP_JWT_SECRET:}
     access-ttl: ${APP_JWT_ACCESS_TTL:15m}
     refresh-ttl: ${APP_JWT_REFRESH_TTL:7d}
     issuer: ${APP_JWT_ISSUER:global-logistics-api}

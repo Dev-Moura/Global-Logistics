@@ -297,13 +297,35 @@ O template de pipeline de CI está em `docs/ci/github-actions.yml` e executa `./
 
 Os erros são retornados como `ProblemDetail` (RFC 9457), com os campos `title`, `status`, `detail`, `code` e `traceId`. O header `X-Correlation-Id` é propagado ou gerado automaticamente para facilitar o rastreamento de requisições.
 
+## Migração de banco legado
+
+Versões anteriores usavam `spring.jpa.hibernate.ddl-auto=update` e não possuíam histórico do Flyway. Ao subir esta versão sobre um volume PostgreSQL antigo, o Flyway recusa um schema não vazio sem `flyway_schema_history`.
+
+Para ambientes de desenvolvimento, recrie o volume:
+
+```bash
+docker compose down -v
+docker compose up -d db
+```
+
+Para dados que precisem ser preservados, faça um dump, recrie o schema vazio, aplique as migrações e reimporte os dados com o mapeamento para `organization_id`. Remessas legadas sem `organization_id` não são acessíveis pela API (todas as consultas são isoladas por tenant).
+
+## Limitações conhecidas do MVP
+
+- `APP_JWT_SECRET` é obrigatório fora do perfil `local`; a aplicação falha ao iniciar sem um segredo de pelo menos 32 bytes.
+- O frete usa `weightKg`, `distanceKm` e `insuredValue` enviados pelo cliente; a distância não é derivada das coordenadas das localizações.
+- Eventos de tracking concorrentes com o mesmo `externalEventId` podem retornar `409` em vez de `200`; a idempotência sequencial é garantida pelo índice único.
+- Logout revoga o refresh token; access tokens continuam válidos até expirarem.
+- Documentos, rotas, processamento assíncrono, analytics e integrações reais com transportadoras estão fora do escopo do MVP (fases 5-8 da especificação).
+
 ## Branches e roadmap por fases
 
 - `feat/phase-1-foundation`: estrutura base, Flyway, camadas e observabilidade.
-- `feat/phase-2-auth`: autenticação JWT, RBAC e multi-tenancy.
+- `feat/phase-2-auth-organizations`: autenticação JWT, RBAC e multi-tenancy.
 - `feat/phase-3-shipments`: ciclo de vida de remessas, DTOs e paginação.
 - `feat/phase-4-tracking`: eventos de rastreamento idempotentes e transições de status.
 - `feat/phase-5-quality`: OpenAPI, observabilidade, documentação e CI.
-- Próximas fases: integrações externas, pagamentos, relatórios e hardening operacional.
+- `fix/mvp-hardening`: correções de segurança, concorrência e integridade pós-revisão.
+- Próximas fases: documentos, rotas, processamento assíncrono, analytics e integrações externas.
 
 Cada fase deve manter os testes existentes verdes, adicionar cobertura para o novo comportamento e preservar o isolamento entre organizações.

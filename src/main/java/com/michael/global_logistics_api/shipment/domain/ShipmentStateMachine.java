@@ -30,10 +30,10 @@ public final class ShipmentStateMachine {
                     "Cannot transition shipment from " + current + " to " + target);
         }
 
-        if (current == ShipmentStatus.IN_TRANSIT && target == ShipmentStatus.CANCELLED
+        if (target == ShipmentStatus.CANCELLED
                 && role != UserRole.SYSTEM_ADMIN && role != UserRole.LOGISTICS_MANAGER) {
             throw new ForbiddenException(
-                    "Only SYSTEM_ADMIN or LOGISTICS_MANAGER can cancel an in-transit shipment");
+                    "Only SYSTEM_ADMIN or LOGISTICS_MANAGER can cancel a shipment");
         }
 
         if (target == ShipmentStatus.IN_TRANSIT && shipment.getActualDeparture() == null) {

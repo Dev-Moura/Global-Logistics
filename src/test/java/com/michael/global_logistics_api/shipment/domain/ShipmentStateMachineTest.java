@@ -24,12 +24,21 @@ class ShipmentStateMachineTest {
     }
 
     @Test
-    void pendingTransitionsToCancelled() {
+    void pendingTransitionsToCancelledByManager() {
         Shipment shipment = shipmentWithStatus(ShipmentStatus.PENDING);
 
-        ShipmentStateMachine.transition(shipment, ShipmentStatus.CANCELLED, UserRole.LOGISTICS_OPERATOR);
+        ShipmentStateMachine.transition(shipment, ShipmentStatus.CANCELLED, UserRole.LOGISTICS_MANAGER);
 
         assertThat(shipment.getStatus()).isEqualTo(ShipmentStatus.CANCELLED);
+    }
+
+    @Test
+    void pendingCannotBeCancelledByOperator() {
+        Shipment shipment = shipmentWithStatus(ShipmentStatus.PENDING);
+
+        assertThatThrownBy(() -> ShipmentStateMachine.transition(
+                shipment, ShipmentStatus.CANCELLED, UserRole.LOGISTICS_OPERATOR))
+                .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
