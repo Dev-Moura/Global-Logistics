@@ -2,6 +2,7 @@ package com.michael.global_logistics_api.common.api;
 
 import com.michael.global_logistics_api.common.domain.ConflictException;
 import com.michael.global_logistics_api.common.domain.DomainException;
+import com.michael.global_logistics_api.common.domain.ForbiddenException;
 import com.michael.global_logistics_api.common.domain.InvalidStateTransitionException;
 import com.michael.global_logistics_api.common.domain.ResourceNotFoundException;
 import com.michael.global_logistics_api.common.domain.UnauthorizedException;
@@ -14,12 +15,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.stream.Collectors;
 
@@ -46,6 +49,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(DataIntegrityViolationException exception) {
         return build(HttpStatus.CONFLICT, "CONFLICT", "The request conflicts with existing data");
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ProblemDetail> handleForbidden(ForbiddenException exception) {
+        return build(HttpStatus.FORBIDDEN, exception.getCode(), exception.getMessage());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -75,6 +83,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ProblemDetail> handleConstraintViolation(ConstraintViolationException exception) {
         return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", exception.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleMethodArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException exception) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR",
+                "Invalid value for parameter: " + exception.getName());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ProblemDetail> handleMessageNotReadable(HttpMessageNotReadableException exception) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Malformed request body");
     }
 
     @ExceptionHandler(DomainException.class)
