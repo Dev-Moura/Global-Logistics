@@ -1,4 +1,4 @@
-package com.michael.global_logistics_api.logistics.domain.model;
+package com.michael.global_logistics_api.shipment.domain;
 
 public enum ShipmentStatus {
     PENDING,
