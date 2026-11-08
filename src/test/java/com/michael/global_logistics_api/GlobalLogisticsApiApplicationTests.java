@@ -1,13 +1,11 @@
 package com.michael.global_logistics_api;
 
+import com.michael.global_logistics_api.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class GlobalLogisticsApiApplicationTests {
+class GlobalLogisticsApiApplicationTests extends AbstractIntegrationTest {
 
-	@Test
-	void contextLoads() {
-	}
-
+    @Test
+    void contextLoads() {
+    }
 }
