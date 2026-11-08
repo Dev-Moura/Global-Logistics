@@ -9,6 +9,8 @@ import com.michael.global_logistics_api.shipment.api.dto.UpdateShipmentStatusReq
 import com.michael.global_logistics_api.shipment.application.ShipmentFilter;
 import com.michael.global_logistics_api.shipment.application.ShipmentService;
 import com.michael.global_logistics_api.shipment.domain.ShipmentStatus;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +35,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping(ApiPaths.API_V1 + "/shipments")
 @RequiredArgsConstructor
+@Tag(name = "Shipments", description = "Gestão do ciclo de vida das remessas")
 public class ShipmentController {
 
     private final ShipmentService shipmentService;
@@ -40,11 +43,13 @@ public class ShipmentController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OPERATOR')")
+    @Operation(summary = "Criar remessa")
     public ShipmentResponse create(@Valid @RequestBody CreateShipmentRequest request) {
         return shipmentService.create(request);
     }
 
     @GetMapping
+    @Operation(summary = "Listar remessas com filtros e paginação")
     public PageResponse<ShipmentResponse> list(
             @RequestParam(required = false) ShipmentStatus status,
             @RequestParam(required = false) UUID originId,
@@ -60,12 +65,14 @@ public class ShipmentController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Obter remessa por identificador")
     public ShipmentResponse get(@PathVariable UUID id) {
         return shipmentService.get(id);
     }
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OPERATOR')")
+    @Operation(summary = "Atualizar dados da remessa")
     public ShipmentResponse update(@PathVariable UUID id,
                                    @Valid @RequestBody UpdateShipmentRequest request) {
         return shipmentService.update(id, request);
@@ -73,6 +80,7 @@ public class ShipmentController {
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'LOGISTICS_MANAGER', 'LOGISTICS_OPERATOR')")
+    @Operation(summary = "Atualizar status da remessa")
     public ShipmentResponse updateStatus(@PathVariable UUID id,
                                          @Valid @RequestBody UpdateShipmentStatusRequest request) {
         return shipmentService.updateStatus(id, request.status());
@@ -80,6 +88,7 @@ public class ShipmentController {
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'LOGISTICS_MANAGER')")
+    @Operation(summary = "Cancelar remessa")
     public ShipmentResponse cancel(@PathVariable UUID id) {
         return shipmentService.cancel(id);
     }

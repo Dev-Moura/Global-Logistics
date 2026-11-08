@@ -6,6 +6,8 @@ import com.michael.global_logistics_api.organization.api.dto.OrganizationRespons
 import com.michael.global_logistics_api.organization.api.dto.UpdateOrganizationRequest;
 import com.michael.global_logistics_api.organization.api.dto.UserResponse;
 import com.michael.global_logistics_api.organization.application.OrganizationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +23,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping(ApiPaths.API_V1 + "/organizations")
+@Tag(name = "Organizations", description = "Gestão de organizações e usuários")
 public class OrganizationController {
 
     private final OrganizationService organizationService;
@@ -32,22 +35,26 @@ public class OrganizationController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @Operation(summary = "Criar organização")
     public OrganizationResponse create(@Valid @RequestBody CreateOrganizationRequest request) {
         return organizationService.create(request);
     }
 
     @GetMapping("/me")
+    @Operation(summary = "Obter organização atual")
     public OrganizationResponse getCurrent() {
         return organizationService.getCurrent();
     }
 
     @PatchMapping("/me")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'LOGISTICS_MANAGER')")
+    @Operation(summary = "Atualizar organização atual")
     public OrganizationResponse updateCurrent(@Valid @RequestBody UpdateOrganizationRequest request) {
         return organizationService.updateCurrent(request);
     }
 
     @GetMapping("/users")
+    @Operation(summary = "Listar usuários da organização atual")
     public List<UserResponse> listUsers() {
         return organizationService.listUsers();
     }
